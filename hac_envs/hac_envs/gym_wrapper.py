@@ -4,6 +4,7 @@ import numpy as np
 
 from gymnasium import spaces
 from graph_rl.envs.goal_env import GoalEnv
+from hac_envs.environment import Environment
 
 
 class GymWrapper(GoalEnv):
@@ -14,14 +15,18 @@ class GymWrapper(GoalEnv):
     https://github.com/andrew-j-levy/Hierarchical-Actor-Critc-HAC-
     """
 
-    def __init__(self, hac_env, observation_space_bounds=None):
-        self.hac_env = hac_env
-        self.max_episode_length = hac_env.max_actions
+    def __init__(self, hac_env: Environment, observation_space_bounds=None):
+        self.hac_env: Environment = hac_env
+        self.max_episode_length: int = hac_env.max_actions
         self.viewer = None
 
         # action space
-        action_low = hac_env.action_offset - hac_env.action_bounds
-        action_high = hac_env.action_offset + hac_env.action_bounds
+        action_low = np.astype(
+            hac_env.action_offset - hac_env.action_bounds, np.float32
+        )
+        action_high = np.astype(
+            hac_env.action_offset + hac_env.action_bounds, np.float32
+        )
         self.action_space = spaces.Box(
             low=action_low, high=action_high, dtype=np.float32
         )
@@ -40,10 +45,17 @@ class GymWrapper(GoalEnv):
             )
 
         # goal spaces (Use goal space used for training in original paper)
-        goal_low = np.array(hac_env.subgoal_bounds)[:, 0]
-        goal_high = np.array(hac_env.goal_space_train)[:, 1]
+        # desired goal
+        goal_low = np.array(hac_env.goal_space_train, dtype=np.float32)[:, 0]
+        goal_high = np.array(hac_env.goal_space_train, dtype=np.float32)[:, 1]
         desired_goal_space = spaces.Box(low=goal_low, high=goal_high, dtype=np.float32)
-        achieved_goal_space = desired_goal_space
+
+        # achieved goal
+        achieved_low = np.array(hac_env.subgoal_bounds, dtype=np.float32)[:, 0]
+        achieved_high = np.array(hac_env.subgoal_bounds, dtype=np.float32)[:, 1]
+        achieved_goal_space = spaces.Box(
+            low=achieved_low, high=achieved_high, dtype=np.float32
+        )
 
         # observation space, including desired and achieved goal
         self.observation_space = spaces.Dict(
@@ -56,16 +68,20 @@ class GymWrapper(GoalEnv):
 
         self.reset()
 
-    def _get_obs(self, state):
+    def _get_obs(self, state: np.ndarray) -> dict[str, np.ndarray]:
         achieved_goal = self.hac_env.project_state_to_end_goal(self.hac_env.sim, state)
+
         obs = {
-            "observation": state,
-            "desired_goal": self.desired_goal,
-            "achieved_goal": achieved_goal,
+            "observation": np.array(state, dtype=np.float32),
+            "desired_goal": np.array(self.desired_goal, dtype=np.float32),
+            "achieved_goal": np.array(achieved_goal, dtype=np.float32),
         }
+
         return obs
 
-    def compute_reward(self, achieved_goal, desired_goal, info):
+    def compute_reward(
+        self, achieved_goal: np.ndarray, desired_goal: np.ndarray, info: dict
+    ):
         tolerance = self.hac_env.end_goal_thresholds
         reward = 0.0
         for a_goal, d_goal, tol in zip(achieved_goal, desired_goal, tolerance):
@@ -75,10 +91,12 @@ class GymWrapper(GoalEnv):
         return reward
 
     def step(self, action):
+        info = {}
         state = self.hac_env.execute_action(action)
         self.n_steps += 1
+
+        info["n_steps"] = self.n_steps
         obs = self._get_obs(state)
-        info = {}
         reward = self.compute_reward(obs["achieved_goal"], obs["desired_goal"], info)
 
         terminated = reward == 0.0
@@ -86,15 +104,17 @@ class GymWrapper(GoalEnv):
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
+        self.n_steps = 0
         self.desired_goal = self.hac_env.get_next_goal(test=False)
         sig = inspect.signature(self.hac_env.reset_sim)
         if "next_goal" in sig.parameters:
             state = self.hac_env.reset_sim(self.desired_goal)
         else:
             state = self.hac_env.reset_sim()
+
         obs = self._get_obs(state)
-        self.n_steps = 0
-        return obs, {}
+
+        return obs, {"n_steps": self.n_steps}
 
     def update_subgoals(self, subgoals):
         self.hac_env.display_subgoals(subgoals + [None])
@@ -105,9 +125,5 @@ class GymWrapper(GoalEnv):
         # by HAC environments.
         self.update_subgoals(subgoals)
 
-    def render(self, mode):
-        if self.viewer is None:
-            self.viewer = mujoco.viewer.launch_passive(
-                self.hac_env.sim.model, self.hac_env.sim.data
-            )
-        self.viewer.sync()
+    def render(self, mode=None):
+        return self.hac_env.render()

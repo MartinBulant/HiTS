@@ -26,6 +26,7 @@ def set_seed(seed: int):
 def run(dir_path, torch_num_threads=None):
     # load parameters from json files
     run_params, graph_params, varied_hps = load_params(dir_path)
+    step = 0
 
     LOG.info(f"Run params: {log_pretty(run_params)}")
     LOG.info(f"Graph params: {log_pretty(graph_params)}")
@@ -34,8 +35,6 @@ def run(dir_path, torch_num_threads=None):
     if os.path.isdir(os.path.join(dir_path, "state")):
         with open(os.path.join(dir_path, "state", "step.json"), "r") as json_file:
             step = json.load(json_file)["step"]
-    else:
-        step = 0
 
     LOG.info(f"Current step: {step}")
     log_dir = os.path.join(dir_path, "log")

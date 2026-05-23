@@ -2,6 +2,7 @@ import os
 import numpy as np
 import mujoco
 import mujoco.viewer
+import atexit
 
 
 class MjSimCompat:
@@ -25,6 +26,8 @@ class Environment:
         max_actions=1200,
         num_frames_skip=10,
         show=False,
+        render_height=480,
+        render_width=640,
     ):
         self.name = model_name
 
@@ -32,6 +35,12 @@ class Environment:
         model_path = os.path.join(os.path.dirname(__file__), "mujoco_files", model_name)
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
+
+        self._render = mujoco.Renderer(
+            self.model, height=render_height, width=render_width
+        )
+
+        atexit.register(self._render.close)
 
         self.sim = MjSimCompat(self.model, self.data)
 
@@ -323,3 +332,7 @@ class Environment:
                 self.data.mocap_pos[i] = subgoals[subgoal_ind]
                 self.model.site_rgba[i][3] = 1
                 subgoal_ind += 1
+
+    def render(self) -> np.ndarray:
+        self._render.update_scene(self.sim.data)
+        return self._render.render().transpose(2, 0, 1)

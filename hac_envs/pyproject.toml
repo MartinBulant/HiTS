@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hac_envs"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "gymnasium",
+    "mujoco",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+include = ["hac_envs/mujoco_files/*.xml"]

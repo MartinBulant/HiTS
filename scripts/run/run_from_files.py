@@ -1,19 +1,35 @@
-import argparse
-import json
-import numpy as np
-import torch
 import os
+import pprint
+import logging
+import json
+import torch
+import argparse
+import numpy as np
 
 from .core import load_params, run_session, get_env_and_graph
+
+LOG = logging.getLogger(__name__)
+pp = pprint.PrettyPrinter(indent=2, sort_dicts=False)
+
+
+def log_pretty(obj):
+    pretty_out = f"{pp.pformat(obj)}"
+    return f"{pretty_out}\n"
+
+
+def set_seed(seed: int):
+    np.random.seed(seed=seed)
+    torch.manual_seed(seed=seed)
+    LOG.info(f"Seed was set to the value {seed}.")
 
 
 def run(dir_path, torch_num_threads=None):
     # load parameters from json files
     run_params, graph_params, varied_hps = load_params(dir_path)
-    base_params = {
-        "run_params": run_params,
-        "graph_params": graph_params
-    }
+
+    LOG.info(f"Run params: {log_pretty(run_params)}")
+    LOG.info(f"Graph params: {log_pretty(graph_params)}")
+    LOG.info(f"Varied hps: {log_pretty(varied_hps)}")
 
     if os.path.isdir(os.path.join(dir_path, "state")):
         with open(os.path.join(dir_path, "state", "step.json"), "r") as json_file:
@@ -21,16 +37,11 @@ def run(dir_path, torch_num_threads=None):
     else:
         step = 0
 
-    print("Current step: ", step)
-    
+    LOG.info(f"Current step: {step}")
     log_dir = os.path.join(dir_path, "log")
-   
-    params = base_params
-    varied_params = varied_hps
 
     # seed numpy and pytorch
-    np.random.seed(run_params["seed"])
-    torch.manual_seed(run_params["seed"])
+    set_seed(run_params["seed"])
 
     env, graph = get_env_and_graph(run_params, graph_params)
 
@@ -38,7 +49,7 @@ def run(dir_path, torch_num_threads=None):
     state_dir = os.path.join(dir_path, "state")
     if os.path.isdir(state_dir):
         print("Loading state of graph.")
-        graph.load_state(dir_path=state_dir) 
+        graph.load_state(dir_path=state_dir)
         # also override logs with saved version in case the process was killed
         # before the state could be saved
         log_state_dir = os.path.join(dir_path, "state", "log")
@@ -47,17 +58,17 @@ def run(dir_path, torch_num_threads=None):
         shutil.copytree(log_state_dir, log_dir)
 
     # save parameters in json file
-    os.makedirs(dir_path, exist_ok = True)
+    os.makedirs(dir_path, exist_ok=True)
 
     run_params_path = os.path.join(dir_path, "run_params.json")
     with open(run_params_path, "w") as run_params_file:
-        json.dump(run_params, run_params_file, indent = 4)
+        json.dump(run_params, run_params_file, indent=4)
     graph_params_path = os.path.join(dir_path, "graph_params.json")
     with open(graph_params_path, "w") as graph_params_file:
-        json.dump(graph_params, graph_params_file, indent = 4)
+        json.dump(graph_params, graph_params_file, indent=4)
     varied_params_path = os.path.join(dir_path, "varied_hp.json")
     with open(varied_params_path, "w") as varied_params_file:
-        json.dump(varied_hps, varied_params_file, indent = 4)
+        json.dump(varied_hps, varied_params_file, indent=4)
 
     # run session
     sess_props = run_session(dir_path, graph, env, run_params, step)
@@ -68,11 +79,11 @@ def run(dir_path, torch_num_threads=None):
         shutil.rmtree(log_state_dir)
 
     if sess_props["timed_out"]:
-        # save the state of the graph (replay buffer, parameters...) in 
+        # save the state of the graph (replay buffer, parameters...) in
         # order to be able to continue training
         print("Saving state of graph.")
         state_dir = os.path.join(dir_path, "state")
-        os.makedirs(state_dir, exist_ok = True)
+        os.makedirs(state_dir, exist_ok=True)
         graph.save_state(os.path.join(state_dir))
         # save a copy of the log directory in the state directory
         shutil.copytree(os.path.join(dir_path, "log"), log_state_dir)
@@ -82,9 +93,9 @@ def run(dir_path, torch_num_threads=None):
         if os.path.isdir(state_path):
             shutil.rmtree(state_path)
 
-    os.makedirs(os.path.join(dir_path, "state"), exist_ok = True)
+    os.makedirs(os.path.join(dir_path, "state"), exist_ok=True)
     with open(os.path.join(dir_path, "state", "step.json"), "w") as json_file:
-        json.dump({"step": sess_props["total_step"]}, json_file, indent = 4)
+        json.dump({"step": sess_props["total_step"]}, json_file, indent=4)
 
 
 if __name__ == "__main__":
@@ -95,13 +106,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "dir",
         default=None,
-        help="Directory with json files containing parameters for run."
+        help="Directory with json files containing parameters for run.",
     )
     parser.add_argument(
         "--torch_num_threads",
         default=None,
         type=int,
-        help="Overwrites number of threads to use in pytorch."
+        help="Overwrites number of threads to use in pytorch.",
     )
     args = parser.parse_args()
 

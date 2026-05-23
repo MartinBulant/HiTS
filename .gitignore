@@ -7,4 +7,11 @@ venv/
 *.csv
 plots/
 tensorboard/
+
+# Folders
+.vscode
 .venv
+wandb
+private
+logs
+

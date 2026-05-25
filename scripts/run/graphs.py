@@ -1,7 +1,10 @@
 import numpy as np
+import logging
 
 from graph_rl.graphs import HiTSGraph, HACGraph
 from .interruption_policies.string_to_ip import get_ip_callable
+
+LOG = logging.getLogger(__name__)
 
 
 def create_graph(env, graph_params, run_params, subtask_specs, level_algo_kwargs_list):
@@ -69,9 +72,13 @@ def create_graph_hits(env, n_layers, n_steps, subtask_specs, level_algo_kwargs_l
                 level_algo_kwargs_list[i]["buffer_size"] = (
                     int(bs_factor * n_steps) * n_goals
                 )
-            print(f"Buffer size level {i}: {level_algo_kwargs_list[i]['buffer_size']}")
+            LOG.info(
+                f"Buffer size level {i}: {level_algo_kwargs_list[i]['buffer_size']}"
+            )
             if "buffer_size_factor" in level_algo_kwargs_list[i]:
                 del level_algo_kwargs_list[i]["buffer_size_factor"]
+
+    update_tsgs_rendering = env.get_wrapper_attr("update_timed_subgoals")
 
     graph = HiTSGraph(
         name="hits_graph",
@@ -80,9 +87,7 @@ def create_graph_hits(env, n_layers, n_steps, subtask_specs, level_algo_kwargs_l
         subtask_specs=subtask_specs,
         HAC_kwargs=level_algo_kwargs_list[-1],
         HiTS_kwargs=level_algo_kwargs_list[:-1],
-        update_tsgs_rendering=env.update_timed_subgoals
-        if hasattr(env, "update_subgoals")
-        else None,
+        update_tsgs_rendering=update_tsgs_rendering,
     )
 
     return graph
@@ -113,19 +118,20 @@ def create_graph_hac(env, n_layers, n_steps, subtask_specs, level_algo_kwargs_li
                 )
                 * n_goals
             )
-            print(f"Buffer size level {i}: {level_algo_kwargs_list[i]['buffer_size']}")
+            LOG.info(
+                f"Buffer size level {i}: {level_algo_kwargs_list[i]['buffer_size']}"
+            )
             if "buffer_size_factor" in level_algo_kwargs_list[i]:
                 del level_algo_kwargs_list[i]["buffer_size_factor"]
 
+    update_sgs_rendering = env.get_wrapper_attr("update_subgoals")
     graph = HACGraph(
         name="hac_graph",
         n_layers=n_layers,
         env=env,
         subtask_specs=subtask_specs,
         HAC_kwargs=level_algo_kwargs_list,
-        update_sgs_rendering=env.update_subgoals
-        if hasattr(env, "update_subgoals")
-        else None,
+        update_sgs_rendering=update_sgs_rendering,
     )
 
     return graph

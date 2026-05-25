@@ -135,9 +135,11 @@ class Environment:
 
     def display_end_goal(self, end_goal):
         if self.name == "pendulum.xml":
-            self.data.mocap_pos[0] = np.array(
+            pos = np.array(
                 [0.5 * np.sin(end_goal[0]), 0, 0.5 * np.cos(end_goal[0]) + 0.6]
             )
+
+            self.data.mocap_pos[0] = pos
         elif self.name == "ur5.xml":
             theta_1, theta_2, theta_3 = end_goal[0], end_goal[1], end_goal[2]
 
@@ -260,7 +262,6 @@ class Environment:
                     self.goal_space_test[i][0], self.goal_space_test[i][1]
                 )
 
-        self.display_end_goal(end_goal)
         return end_goal
 
     def display_subgoals(self, subgoals):
@@ -334,5 +335,5 @@ class Environment:
                 subgoal_ind += 1
 
     def render(self) -> np.ndarray:
-        self._render.update_scene(self.sim.data)
+        self._render.update_scene(self.data)
         return self._render.render().transpose(2, 0, 1)

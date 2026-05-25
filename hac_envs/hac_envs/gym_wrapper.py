@@ -1,10 +1,13 @@
-import mujoco
-import inspect
 import numpy as np
+import inspect
+import logging
+from typing import Any
 
 from gymnasium import spaces
 from graph_rl.envs.goal_env import GoalEnv
 from hac_envs.environment import Environment
+
+LOG = logging.getLogger(__name__)
 
 
 class GymWrapper(GoalEnv):
@@ -103,15 +106,13 @@ class GymWrapper(GoalEnv):
         truncated = self.n_steps >= self.max_episode_length
         return obs, reward, terminated, truncated, info
 
-    def reset(self, **kwargs):
+    def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
+        options = {} if options is None else options
         self.n_steps = 0
-        self.desired_goal = self.hac_env.get_next_goal(test=False)
-        sig = inspect.signature(self.hac_env.reset_sim)
-        if "next_goal" in sig.parameters:
-            state = self.hac_env.reset_sim(self.desired_goal)
-        else:
-            state = self.hac_env.reset_sim()
+        self.desired_goal = self.hac_env.get_next_goal(test=options.get("test", False))
+        state = self.hac_env.reset_sim()
 
+        self.hac_env.display_end_goal(self.desired_goal)
         obs = self._get_obs(state)
 
         return obs, {"n_steps": self.n_steps}
